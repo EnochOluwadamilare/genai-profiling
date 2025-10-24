@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { QuestionData } from '../Question/types';
 import { SlideMeta } from '../Slide/types';
-import ContentLoader from '@knicos/genai-base/components/ContentLoader';
-import { ZipData } from '@knicos/genai-base/util/zip';
+import ContentLoader from '@enoch-genai-fi/baseomponents/ContentLoader';
+import { ZipData } from '@k@enoch-genai-fi/basel/zip';
 import { addImage } from '@genaipg/services/images/images';
 import { Manifest } from './types';
+import localManifest from '../assets/manifest.local.json'; // Local backup manifest
 
 interface Props {
     lang: string;
@@ -21,6 +22,7 @@ export default function ProfileLoader({ lang, profile, onSlides, onForms, onQues
     const [manifest, setManifest] = useState<Manifest>();
     const [profileURL, setProfileURL] = useState<string>();
 
+    // Load remote manifest (fallback to local)
     useEffect(() => {
         fetch(MANIFEST_URL)
             .then((response) => {
@@ -33,15 +35,32 @@ export default function ProfileLoader({ lang, profile, onSlides, onForms, onQues
     }, [onError]);
 
     useEffect(() => {
-        if (manifest) {
-            const m = manifest.profiles[lang]?.[profile];
-            if (m) {
+    if (manifest) {
+        const m = manifest.profiles[lang]?.[profile];
+        if (m) {
+        (async () => {
+            try {
+            const res = await fetch(m.url, { method: 'HEAD' });
+            if (res.ok) {
                 setProfileURL(m.url);
             } else {
-                if (onError) onError();
-                console.error('no_profile', lang, profile);
+                console.warn('Using local fallback');
+                const local = localManifest.profiles[lang]?.[profile];
+                if (local) setProfileURL(local.url);
+                else if (onError) onError();
             }
+            } catch {
+            console.warn('⚠️ Error checking profile URL, using local fallback');
+            const local = localManifest.profiles[lang]?.[profile];
+            if (local) setProfileURL(local.url);
+            else if (onError) onError();
+            }
+        })();
+        } else {
+        if (onError) onError();
+        console.error('no_profile', lang, profile);
         }
+    }
     }, [manifest, lang, profile, onError]);
 
     const doLoad = useCallback(
